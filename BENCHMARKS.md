@@ -230,11 +230,25 @@ Detector fine-tunes on the Roboflow basketball set (10 classes, 464 train / 96 v
 | boxmot:bytetrack | 0.525 | 0.728 | 0.381 | 0.616 | 0.906 | 795 |
 
 Progression for our tracker: 0.486 (COCO person) -> 0.554 (Medium fine-tune) -> 0.578 (Large
-fine-tune, IMM). Two things changed with the better detector: association became the
-limiting term (AssA 0.43 vs DetA 0.79), and the **IMM overtook constant velocity** (+0.014),
-reversing the earlier verdict: with noisy detections the IMM's extra models fit noise, with
-clean ones they fit real cuts and stops. The default stays data-driven: `hoops:imm` with the
-Large detector, `hoops:kalman_cv` with weaker detections. Next lever is ReID for AssA.
+fine-tune, IMM). Association is now the limiting term (AssA 0.43 vs DetA 0.79); ReID is the
+next lever.
+
+### Same, with RF-DETR Large at 896 px (val mAP 0.658, the higher of the two)
+
+| tracker | HOTA | DetA | AssA | IDF1 | MOTA | IDSW |
+|---|---|---|---|---|---|---|
+| hoops:kalman_cv | 0.560 | 0.782 | 0.403 | 0.621 | 0.908 | 797 |
+| trackers:botsort | 0.550 | 0.783 | 0.389 | 0.591 | 0.905 | 852 |
+| hoops:imm | 0.548 | 0.782 | 0.385 | 0.603 | 0.907 | 787 |
+| trackers:bytetrack | 0.536 | 0.786 | 0.368 | 0.576 | 0.905 | 1063 |
+
+Two honest readings. First, the higher validation mAP (on 96 Roboflow images) did **not**
+transfer: the 896 px model tracks slightly worse on SportsMOT than the 736 px one, so the
+736 px Large checkpoint stays the detector of record and the Roboflow val set is too small
+to pick detectors by. Second, the IMM led constant velocity by 0.014 with one detector and
+trailed it by 0.012 with the next: **the two motion models are tied within noise** on this
+benchmark; the earlier "IMM overtook CV" sentence should be read that way. Default stays
+`hoops:kalman_cv` (faster); `hoops:imm` is a legitimate alternative, not an upgrade.
 
 ### Our tracker, ablation on all 15 sequences (same cached detections)
 
