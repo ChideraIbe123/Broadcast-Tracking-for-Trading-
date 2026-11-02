@@ -106,6 +106,16 @@ are neither mirrors nor rotations). Scoring each RANSAC candidate by edge energy
 the projected court lines (`hoops/court/lines.py`) separates them: true homographies
 score 0.22, real-end fits 0.075, ghosts 0.004.
 
+### First end-to-end run on real NBA broadcast video (2026-11-02)
+
+SportsMOT train clip `v_2j7kLB-vEEk_c007` (Heat at Warriors, 720p, 726 frames, frequent
+cuts): `hoops track` with RF-DETR Large at 17 fps on the M4 Pro (26 ids), then
+`hoops calibrate` with the s1280 court model: **32% accepted, 39% uncertain, 29% rejected**;
+sources 50% landmark, 36% flow, 7% predict. Overlays on accepted frames sit on the paint and
+arcs; player dots land in the correct half-court. The rejected share is mostly bench/close-up
+cuts, which is the gate doing its job. (SportsMOT train basketball = 11 NBA + 4 FIBA clips,
+no NCAA; val = 6 NCAA + 9 FIBA.)
+
 ### Other leagues (NCAA, FIBA) with the NBA-trained landmark model
 
 `hoops calibrate ... --court ncaa_men_pre2019|ncaa_men|ncaa_women|fiba`. The landmark
