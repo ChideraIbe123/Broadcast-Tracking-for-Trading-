@@ -106,6 +106,19 @@ are neither mirrors nor rotations). Scoring each RANSAC candidate by edge energy
 the projected court lines (`hoops/court/lines.py`) separates them: true homographies
 score 0.22, real-end fits 0.075, ghosts 0.004.
 
+### SportsMOT train split (11 NBA + 4 FIBA clips), RF-DETR Large @736, Mac M4 Pro
+
+| tracker | HOTA | DetA | AssA | IDF1 | MOTA | IDSW | fps |
+|---|---|---|---|---|---|---|---|
+| hoops:kalman_cv | **0.510** | 0.765 | 0.353 | 0.551 | 0.892 | 963 | 158 |
+| trackers:bytetrack | 0.506 | 0.769 | 0.346 | 0.537 | 0.888 | 1383 | 446 |
+| trackers:botsort | 0.506 | 0.762 | 0.348 | 0.531 | 0.883 | 980 | 160 |
+| hoops:imm | 0.502 | 0.765 | 0.342 | 0.538 | 0.891 | 964 | 121 |
+
+The train clips are harder than val (0.51 vs 0.56 for the same tracker and detector): more
+frequent cuts and denser frames. Ordering holds: ours first, the four within 0.008, which is
+noise on 15 clips. Association (AssA 0.35) is the gap on both splits.
+
 ### First end-to-end run on real NBA broadcast video (2026-11-02)
 
 SportsMOT train clip `v_2j7kLB-vEEk_c007` (Heat at Warriors, 720p, 726 frames, frequent
