@@ -70,11 +70,22 @@ def closing_prices(snapshots: pd.DataFrame, pre_tip_hours: float = 2.5) -> pd.Da
     return out
 
 
-def clv_report(ledger: Path, snapshots: pd.DataFrame) -> pd.DataFrame:
-    """Join paper bets to closing prices; per-bet CLV, fee, and realised P&L when settled."""
+def clv_report(ledger: Path, snapshots: pd.DataFrame, results: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Join paper bets to closing prices; per-bet CLV, fee, and realised P&L when settled.
+    `results` (ticker, result) from client.resolve_results overrides snapshot results,
+    because settled markets stop appearing in open-market snapshots."""
     bets = pd.read_csv(ledger)
     close = closing_prices(snapshots)
+    if results is not None and len(results):
+        res = results[results.result.isin(["yes", "no"])][["ticker", "result"]].rename(columns={"result": "result_api"})
+        close = close.merge(res, on="ticker", how="outer")
+        close["result"] = close.result_api.combine_first(close.result) if "result" in close else close.result_api
+        close = close.drop(columns=["result_api"])
     df = bets.merge(close, on="ticker", how="left")
+    # a bet whose game has not tipped yet has no close: its 'close' is just the latest
+    # price and must not count. Reference time = the latest snapshot (data-driven).
+    now = pd.to_datetime(snapshots.ts, utc=True).max() if "ts" in snapshots and len(snapshots) else pd.Timestamp.now(tz="UTC")
+    df["pending"] = df.close_mid.isna() | (pd.to_datetime(df.tip, utc=True, errors="coerce") > now)
     yes = df.side.str.lower() == "yes"
     close_prob = np.where(yes, df.close_mid, 1 - df.close_mid)
     df["close_prob"] = close_prob
@@ -89,10 +100,15 @@ def clv_report(ledger: Path, snapshots: pd.DataFrame) -> pd.DataFrame:
 
 
 def summarise(report: pd.DataFrame) -> dict:
+    # CLV only counts once the game has tipped (the 'close' is final); earlier it is just
+    # the current price, which moves until tip-off
     r = report.dropna(subset=["clv"])
+    if "pending" in report:
+        r = r[~report.pending.fillna(True)]
     settled = report.dropna(subset=["pnl"])
     out = {
         "bets": int(len(report)),
+        "pending_tip": int(report.pending.sum()) if "pending" in report else 0,
         "with_close": int(len(r)),
         "mean_clv": float(r.clv.mean()) if len(r) else float("nan"),
         "clv_positive_frac": float((r.clv > 0).mean()) if len(r) else float("nan"),

@@ -188,14 +188,17 @@ def kalshi_bet(ticker: str, side: str, price: float, model_prob: float, contract
 @kalshi_app.command("clv")
 def kalshi_clv(ledger: Path = Path("data/kalshi/paper_ledger.csv"), store: Path = Path("data/kalshi")):
     """Closing-line value and P&L of the paper ledger against recorded snapshots."""
-    from hoops.kalshi.client import load_snapshots
+    import pandas as pd
+
+    from hoops.kalshi.client import load_snapshots, resolve_results
     from hoops.kalshi.ledger import clv_report, summarise
 
     snaps = load_snapshots(store)
     if snaps.empty or not ledger.exists():
         rprint("[yellow]need both snapshots and a ledger[/]")
         raise typer.Exit(1)
-    rep = clv_report(ledger, snaps)
+    results = resolve_results(pd.read_csv(ledger).ticker.tolist(), store)
+    rep = clv_report(ledger, snaps, results)
     rprint(summarise(rep))
     rprint(rep[["ts", "ticker", "side", "price", "model_prob", "close_prob", "clv", "pnl"]].tail(15).to_string())
 

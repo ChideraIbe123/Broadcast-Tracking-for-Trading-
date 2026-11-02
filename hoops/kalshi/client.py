@@ -78,6 +78,37 @@ def append_snapshot(store: Path, series: list[str] | None = None) -> pd.DataFram
     return df
 
 
+def fetch_market(ticker: str, session: requests.Session | None = None) -> dict:
+    """One market by ticker (works for settled markets, which `status=open` listings drop)."""
+    s = session or requests.Session()
+    r = s.get(f"{BASE}/markets/{ticker}", timeout=30)
+    r.raise_for_status()
+    return r.json().get("market", {})
+
+
+def resolve_results(tickers: list[str], store: Path) -> pd.DataFrame:
+    """Look up settlement for the given tickers and persist them in store/results.parquet.
+    Returns the full results table (ticker, status, result, settled_ts)."""
+    f = Path(store) / "results.parquet"
+    known = pd.read_parquet(f) if f.exists() else pd.DataFrame(columns=["ticker", "status", "result", "settled_ts"])
+    done = set(known[known.result.isin(["yes", "no"])].ticker)
+    rows = []
+    with requests.Session() as s:
+        for t in sorted(set(tickers) - done):
+            try:
+                m = fetch_market(t, s)
+            except requests.HTTPError:
+                continue
+            rows.append({"ticker": t, "status": m.get("status"), "result": m.get("result") or "", "settled_ts": datetime.now(timezone.utc)})
+            time.sleep(0.1)
+    if rows:
+        new = pd.DataFrame(rows)
+        known = pd.concat([known[~known.ticker.isin(new.ticker)], new], ignore_index=True)
+        Path(store).mkdir(parents=True, exist_ok=True)
+        known.to_parquet(f, index=False)
+    return known
+
+
 def load_snapshots(store: Path) -> pd.DataFrame:
     files = sorted(Path(store).glob("snap_*.parquet"))
     if not files:
