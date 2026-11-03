@@ -50,6 +50,30 @@ competitive-but-not-sharp, the honest starting point. The live test is the paper
 closing-line value (`hoops college predict --log-bets`, then `hoops kalshi clv`); 48 paper
 bets on liquid game markets were logged on 2 November 2026.
 
+### Replay against Kalshi's own 2025-26 prices (`hoops college market-backtest`, 2026-11-03)
+
+Kalshi keeps every settled market and its hourly candles (`/historical/markets`,
+`/historical/markets/{ticker}/candlesticks`, public, no key), so the live paper ledger's
+question can be answered on last season in an afternoon: 5,309 settled KXNCAAMBGAME events,
+4,964 matched to schedule games with a walk-forward prediction, 4,823 with a two-sided quote
+one hour before tip. The policy simulated is exactly `college predict --log-bets` (spread
+<= 5c, price 0.05-0.95, 4-20% edge after the taker fee, one bet per game, 20 contracts).
+
+| quote taken | games | spread (median) | Brier market | Brier model | blend: model coef (t) | CV log loss market -> blend | live-rule bets | ROI on stake | mean CLV (t) |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 h before tip | 4,823 | 1c | **0.173** | 0.178 | -0.07 (-0.8) | 0.512 -> 0.512 | 1,199 | **-10.0%** | -0.7c (-14) |
+| 24 h before tip | 4,615 | 4c | 0.176 | 0.178 | +0.34 (+5.0) | 0.520 -> 0.517 | 388 | -5.8% | +0.9c (+3.8) |
+
+Reading: against the closing market the score-only model carries no information at all (the
+blend coefficient is zero, the bets' CLV is exactly the cost of crossing a 1c spread, and the
+"edges" it finds lose 10% of stake over 1,199 bets, t = -3.6; fees are 3% of that). Against the
+opening market a day earlier it does carry information (t = 5, CLV +0.9c), but the 4c early
+spread plus the fee costs more than the ~3c the market later moves, so even there the policy
+loses money. In other words the market absorbs everything in last season's scores by tip-off,
+and whatever is added (roster information today, video features later) has to beat the
+opener by more than about 4c to be worth trading. Caveat: candles carry no size, so a fill at
+the early ask is assumed, not guaranteed.
+
 ## Motion models on synthetic trajectories (1-step prediction error, px)
 
 `uv run python scripts/motion_compare.py` (synthetic, Gaussian noise 0.3 px)

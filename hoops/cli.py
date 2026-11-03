@@ -203,6 +203,15 @@ def kalshi_clv(ledger: Path = Path("data/kalshi/paper_ledger.csv"), store: Path 
     rprint(rep[["ts", "ticker", "side", "price", "model_prob", "close_prob", "clv", "pnl"]].tail(15).to_string())
 
 
+@kalshi_app.command("history")
+def kalshi_history(series: str = "KXNCAAMBGAME", since: str = "2025-11-01", store: Path = Path("data/kalshi"), refresh_markets: bool = False):
+    """Download settled markets and hourly candles of a past season (incremental; public API)."""
+    from hoops.kalshi.history import build_history
+
+    events, candles = build_history(store, series, since, refresh_markets=refresh_markets, log=rprint)
+    rprint(f"{len(events)} markets, {len(candles)} candles under {store / 'history'}")
+
+
 college_app = typer.Typer(no_args_is_help=True, help="Pre-game college model: ratings, backtest, scoring Kalshi markets")
 app.add_typer(college_app, name="college")
 
@@ -305,6 +314,55 @@ def college_predict(
             already.add(event)
             n += 1
         rprint(f"logged {n} paper bets to {ledger}")
+
+
+@college_app.command("market-backtest")
+def college_market_backtest(
+    season: int = 2026,
+    hours_before: float = typer.Option(1.0, help="use the Kalshi quote this many hours before tip-off"),
+    max_quote_age_h: float = typer.Option(24.0, help="drop games whose last quote is older than this"),
+    store: Path = Path("data/kalshi"),
+    out: Path = Path("out/college"),
+    download: bool = typer.Option(True, help="fetch missing Kalshi history first"),
+):
+    """Replay a season's walk-forward predictions against Kalshi's historical prices:
+    market vs model accuracy, blend test, and the live betting policy's P&L and CLV."""
+    import json
+
+    import pandas as pd
+
+    from hoops.college.data import load_games, team_table
+    from hoops.college.kalshi_map import TeamMatcher
+    from hoops.college.market_backtest import replay
+    from hoops.kalshi.history import build_history
+
+    pf = out / f"backtest_{season}.parquet"
+    if not pf.exists():
+        rprint(f"[yellow]no walk-forward predictions at {pf}; run `hoops college backtest --season {season}` first[/]")
+        raise typer.Exit(1)
+    pred = pd.read_parquet(pf)
+    games = load_games([season - 1, season])
+    since = f"{season - 1}-11-01"
+    if download:
+        events, candles = build_history(store, "KXNCAAMBGAME", since, log=rprint)
+    else:
+        events = pd.read_parquet(store / "history" / "markets_KXNCAAMBGAME.parquet")
+        candles = pd.read_parquet(store / "history" / "candles_KXNCAAMBGAME.parquet")
+    table, summary = replay(pred, games[games.season == season], events, candles, TeamMatcher(team_table(games)), hours_before, max_quote_age_h)
+    out.mkdir(parents=True, exist_ok=True)
+    tag = f"{season}_h{hours_before:g}"
+    table.to_parquet(out / f"market_backtest_{tag}.parquet", index=False)
+    (out / f"market_backtest_{tag}.json").write_text(json.dumps(summary, indent=2, default=str))
+    for k, v in summary.items():
+        if k not in ("by_min_edge", "policy_by_month"):
+            rprint(f"{k}: {v}")
+    rprint("by min edge:")
+    for e, v in summary["by_min_edge"].items():
+        rprint(f"  {e}: {v}")
+    if "policy_by_month" in summary:
+        rprint("live policy by month:")
+        for m, v in summary["policy_by_month"].items():
+            rprint(f"  {m}: bets {v['bets']} pnl {v['pnl']} roi {v['roi_on_stake']} clv {v['mean_clv']}")
 
 
 if __name__ == "__main__":

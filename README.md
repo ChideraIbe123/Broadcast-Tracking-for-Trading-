@@ -35,7 +35,7 @@ uv run python scripts/download_datasets.py sportsmot   # prints the registration
 | Win probability | `hoops/wp` game-state baseline (LightGBM + logistic on 1996–2025 play-by-play); tracking-augmented model next | baseline trained, see BENCHMARKS.md |
 | Other leagues | `--court ncaa_men / ncaa_men_pre2019 / ncaa_women / fiba` (same landmark ids, different coordinates); line-alignment refinement + plausibility gate | works coarsely on NCAA/FIBA clips without new labels (BENCHMARKS.md) |
 | Kalshi paper trading | `hoops/kalshi`: public-API snapshot recorder (no key), paper-bet ledger, closing-line value and fee maths | recording NCAA game/spread/total markets every 10 min |
-| College pre-game model | `hoops/college`: ridge margin ratings on free sportsdataverse scores, walk-forward backtest, Kalshi market matcher and scorer | Brier 0.166 / log loss 0.49 on 2025-26 walk-forward; paper bets logging since 2 Nov 2026 |
+| College pre-game model | `hoops/college`: ridge margin ratings on free sportsdataverse scores, walk-forward backtest, Kalshi market matcher and scorer, replay against Kalshi's historical prices | Brier 0.166 on 2025-26 walk-forward, but no information beyond Kalshi's closing price (replay: -10% ROI over 1,199 simulated bets); paper bets logging since 2 Nov 2026 |
 
 ## What needs you
 
@@ -62,6 +62,8 @@ uv run hoops kalshi bet KXNCAAMBGAME-26NOV05TOWSUTAH-UTAH yes 0.68 0.74 --contra
 uv run hoops kalshi clv                                # closing-line value of the paper ledger
 uv run hoops college backtest --season 2026           # walk-forward rating model, calibrated on the previous season
 uv run hoops college predict --log-bets               # score today's Kalshi NCAA markets, log paper bets (liquid game markets)
+uv run hoops kalshi history --since 2025-11-01        # download a past season's settled markets + hourly candles (public archive)
+uv run hoops college market-backtest --hours-before 1 # replay the season against Kalshi's prices: market vs model, blend test, policy P&L/CLV
 bash scripts/college_daily.sh                         # the whole daily loop: refresh scores, snapshot, predict, CLV
 uv run hoops bench --data data/sportsmot --trackers hoops:kalman_cv,hoops:imm,trackers:bytetrack,ultralytics:tracktrack
 ```
